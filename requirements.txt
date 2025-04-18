@@ -1,8 +1,6 @@
-
 streamlit
 pandas
+openpyxl
 PyMuPDF
 langchain
 llama-cpp-python
-openpyxl
-PyMuPDF==1.22.5
