@@ -1,81 +1,58 @@
 import streamlit as st
 import pandas as pd
-import fitz  # PyMuPDF
-import requests
-import os
-from langchain.llms import LlamaCpp
-from langchain.chains import load_qa_chain
-from langchain.docstore.document import Document
+import pdfplumber
+from transformers import pipeline
 
-# إعدادات التطبيق
+# تهيئة التطبيق
 st.set_page_config(
-    page_title="مفيد باشا - مساعدك الذكي",
+    page_title="مساعدك الذكي - النسخة المجانية",
     layout="wide",
-    page_icon="🤖",
-    menu_items={"About": "تم التطوير بواسطة فريق مفيد باشا"}
+    page_icon="🤖"
 )
 
-# إعدادات النموذج (بدون ملف config.yml)
-MODEL_CONFIG = {
-    "url": "https://drive.usercontent.google.com/download?id=11ARnFAX2I6a-OSSOTtPqvaP41qwe4UHw&export=download",
-    "path": "model.bin",
-    "settings": {
-        "temperature": 0.1,
-        "max_tokens": 512,
-        "n_ctx": 2048,
-        "verbose": False
-    }
-}
+# تحميل نموذج خفيف الوزن من Hugging Face
+@st.cache_resource
+def load_ai_model():
+    return pipeline(
+        "question-answering",
+        model="mrm8488/bert-tiny-5-finetuned-squadv2"  # نموذج صغير بحجم 15MB فقط
+    )
 
-# ─── وظائف أساسية ─────────────────────────────────────────────────
-def download_model():
-    """تنزيل النموذج من Google Drive"""
-    if not os.path.exists(MODEL_CONFIG["path"]):
-        with st.spinner("🔄 جاري تحميل النموذج..."):
-            try:
-                response = requests.get(MODEL_CONFIG["url"], stream=True)
-                with open(MODEL_CONFIG["path"], "wb") as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
-            except Exception as e:
-                st.error(f"❌ فشل في التحميل: {e}")
-                st.stop()
+# ─── وظائف معالجة الملفات ───────────────────────────────────
+def extract_text(uploaded_file):
+    """استخراج النص من PDF أو Excel"""
+    try:
+        if uploaded_file.type == "application/pdf":
+            with pdfplumber.open(uploaded_file) as pdf:
+                return "\n".join([page.extract_text() for page in pdf.pages])
+        else:
+            df = pd.read_excel(uploaded_file)
+            return df.to_string()
+    except Exception as e:
+        st.error(f"خطأ في معالجة الملف: {str(e)}")
+        return None
 
-def process_file(uploaded_file):
-    """معالجة الملفات المرفوعة"""
-    if uploaded_file.type == "application/pdf":
-        with fitz.open(stream=uploaded_file.read(), filetype="pdf") as doc:
-            return "\n".join([page.get_text() for page in doc])
-    else:
-        df = pd.read_excel(uploaded_file)
-        return df.to_string()
-
-# ─── واجهة المستخدم ───────────────────────────────────────────────
-st.title("🤖 مفيد باشا - مساعدك الذكي")
-uploaded_file = st.file_uploader("📁 ارفع ملف PDF أو Excel", type=["pdf", "xlsx"])
+# ─── واجهة المستخدم ─────────────────────────────────────────
+st.title("🤖 مساعدك الذكي - النسخة المجانية")
+uploaded_file = st.file_uploader("ارفع ملف PDF أو Excel", type=["pdf", "xlsx"])
 
 if uploaded_file:
-    text_data = process_file(uploaded_file)
-    st.subheader("📄 المحتوى المستخرج")
-    st.text_area("النص", text_data, height=250)
-
-    if st.text_input("💬 اكتب سؤالك:"):
-        download_model()  # تأكيد وجود النموذج
+    extracted_text = extract_text(uploaded_file)
+    
+    if extracted_text:
+        st.subheader("📄 المحتوى المستخرج")
+        st.text_area("النص", extracted_text, height=250)
         
-        llm = LlamaCpp(
-            model_path=MODEL_CONFIG["path"],
-            **MODEL_CONFIG["settings"]
-        )
+        question = st.text_input("💬 اكتب سؤالك هنا:")
         
-        chain = load_qa_chain(llm, chain_type="stuff")
-        docs = [Document(page_content=text_data)]
-        
-        try:
-            answer = chain.run(input_documents=docs, question=st.session_state.question)
-            st.subheader("✅ الإجابة:")
-            st.write(answer)
-        except Exception as e:
-            st.error(f"⚠️ خطأ: {str(e)}")
+        if question:
+            qa_model = load_ai_model()
+            with st.spinner("جاري البحث عن الإجابة..."):
+                try:
+                    answer = qa_model(question=question, context=extracted_text)
+                    st.subheader("✅ الإجابة:")
+                    st.markdown(f"**{answer['answer']}** (الثقة: {answer['score']:.2f})")
+                except Exception as e:
+                    st.error(f"فشل في الحصول على الإجابة: {str(e)}")
 else:
-    st.info("👆 الرجاء رفع ملف لبدء التحليل")
+    st.info("👋 الرجاء رفع ملف لبدء التحليل.")
