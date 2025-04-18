@@ -5,3 +5,4 @@ PyMuPDF
 langchain
 llama-cpp-python
 pyyaml
+requests
