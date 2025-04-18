@@ -4,3 +4,4 @@ openpyxl
 PyMuPDF
 langchain
 llama-cpp-python
+pyyaml
