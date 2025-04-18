@@ -1,6 +1,7 @@
+
 streamlit
 pandas
-openpyxl
-pymupdf
-llama-cpp-python
+PyMuPDF
 langchain
+llama-cpp-python
+openpyxl
