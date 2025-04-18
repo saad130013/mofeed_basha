@@ -1,5 +1,6 @@
-streamlit==1.33.0
-pandas==2.2.1
-pdfplumber==0.10.3  # لمعالجة PDF بدون مكتبات نظام
-transformers==4.40.1  # لنماذج Hugging Face
-torch==2.2.1  # ضروري لـ Transformers
+streamlit
+pandas
+openpyxl
+pdfplumber
+transformers
+torch
